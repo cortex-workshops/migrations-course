@@ -1,0 +1,137 @@
+{
+    "name": "PostgreSQL Upgrade Prep",
+    "tag": "postgresql-upgrade",
+    "description": "Standardizes pre-upgrade steps for Postgres: verify, back up, approve, and hand off.",
+    "isDraft": true,
+    "filter": {
+        "entityFilter": {
+            "typeFilter": {
+                "types": [
+                    "databases"
+                ]
+            },
+            "entityGroupFilter": null
+        },
+        "ownershipScope": "ALL",
+        "type": "ENTITY"
+    },
+    "runResponseTemplate": null,
+    "actions": [
+        {
+            "name": "Pre-upgrade attestation",
+            "slug": "pre-upgrade-attestation",
+            "schema": {
+                "inputs": [
+                    {
+                        "name": "Rollback attestation",
+                        "description": "A rollback procedure is documented and linked in the entity docs.",
+                        "key": "rollback-attestation",
+                        "required": true,
+                        "defaultValue": false,
+                        "type": "TOGGLE_FIELD"
+                    },
+                    {
+                        "name": "Expected downtime communicated",
+                        "description": "Expected downtime has been communicated to stakeholders",
+                        "key": "expected-downtime-communicated",
+                        "required": true,
+                        "defaultValue": false,
+                        "type": "TOGGLE_FIELD"
+                    },
+                    {
+                        "name": "Version compatibility reviews",
+                        "description": "Version compatibility has been reviewed with the app team.",
+                        "key": "version-compatibility-reviews",
+                        "required": true,
+                        "defaultValue": false,
+                        "type": "TOGGLE_FIELD"
+                    }
+                ],
+                "inputOverrides": [],
+                "type": "USER_INPUT"
+            },
+            "outgoingActions": [
+                "branch"
+            ],
+            "isRootAction": true
+        },
+        {
+            "name": "Branch",
+            "slug": "branch",
+            "schema": {
+                "branches": [
+                    {
+                        "name": "Attestation complete",
+                        "slug": "attestation-complete",
+                        "outgoingAction": "trigger-backup-workflow",
+                        "expression": "actions[\"pre-upgrade-attestation\"].outputs[\"rollback-attestation\"] == true && actions[\"pre-upgrade-attestation\"].outputs[\"expected-downtime-communicated\"] == true && actions[\"pre-upgrade-attestation\"].outputs[\"version-compatibility-reviews\"] == true",
+                        "type": "CONDITIONAL"
+                    }
+                ],
+                "fallbackBranch": {
+                    "name": "Attestation incomplete",
+                    "slug": "attestation-incomplete",
+                    "outgoingAction": null,
+                    "type": "FALLBACK"
+                },
+                "joiningAction": null,
+                "type": "CONDITIONAL_BRANCH"
+            },
+            "outgoingActions": [
+                "trigger-backup-workflow"
+            ],
+            "isRootAction": false
+        },
+        {
+            "name": "Trigger backup workflow",
+            "slug": "trigger-backup-workflow",
+            "schema": {
+                "inputs": {
+                    "ref": "main",
+                    "repo": "my-org/infrastructure",
+                    "inputs": "{\n\"db_name\": {{context.entity.name}}\n}",
+                    "workflow_id": ".github/workdlows/pg-backup.yml"
+                },
+                "integrationAlias": "cortex",
+                "actionIdentifier": "github.createWorkflowDispatchEvent",
+                "type": "ADVANCED_HTTP_REQUEST"
+            },
+            "outgoingActions": [
+                "owner-approval"
+            ],
+            "isRootAction": false
+        },
+        {
+            "name": "Owner approval",
+            "slug": "owner-approval",
+            "schema": {
+                "approvingTeamIds": [
+                    "en31b85af0c7571640"
+                ],
+                "type": "MANUAL_APPROVAL"
+            },
+            "outgoingActions": [
+                "create-jira-upgrade-ticket"
+            ],
+            "isRootAction": false
+        },
+        {
+            "name": "Create Jira upgrade ticket",
+            "slug": "create-jira-upgrade-ticket",
+            "schema": {
+                "headers": {
+                    "Content-Type": "application/text",
+                    "Authorization": "Bearer {{context.secrets.apiKey}}"
+                },
+                "httpMethod": "POST",
+                "payload": "{\n    \"fields\": {\n       \"project\":\n       {\n          \"key\": \"{{context.entity.descriptor.x-cortex-issues.project}}\"\n       },\n       \"summary\": \"Entity {{context.entity.name}} ready for PostgreSQL upgrade.\",\n       \"description\": \"Backup job completed and manual attestation approved. {{context.entity.name}} ready for migration.\",\n       \"issuetype\": {\n          \"name\": \"Triage\"\n       },\n       \"assignee\":{\"name\":\"{{context.initiatedBy.name}}\"}\n   }\n}",
+                "url": "https://api.jira.com/tickets",
+                "type": "HTTP_REQUEST"
+            },
+            "outgoingActions": [],
+            "isRootAction": false
+        }
+    ],
+    "runRestrictionPolicies": [],
+    "iconTag": "Database"
+}
