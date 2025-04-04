@@ -1,0 +1,40 @@
+tag: git-migration
+name: Git Migration
+description: Tracking service migration to GitHub SaaS from GitHub Enterprise Server
+draft: false
+notifications:
+  enabled: true
+  scoreDropNotificationsEnabled: false
+exemptions:
+  enabled: true
+  autoApprove: false
+ladder:
+  name: Default Ladder
+  levels:
+  - name: Discovery for Migration to GitHub SaaS
+    rank: 1
+    color: "#5EC8D8"
+  - name: Fully Migrated to GitHub SaaS
+    rank: 2
+    color: "#9DC676"
+rules:
+- title: Service has git repo attached
+  expression: git != null
+  identifier: 335eeb5e-bea8-37e2-ab50-de28d956998b
+  weight: 1
+  level: Discovery for Migration to GitHub SaaS
+- title: Commits in the last 6 months
+  expression: git.lastCommit().freshness <= duration("P0Y6M0D")
+  identifier: cd108d03-1caa-3910-9252-cb36d3d2c6f7
+  weight: 1
+  level: Discovery for Migration to GitHub SaaS
+- title: Service migrated to GitHub Saas
+  expression: entity.descriptor().info.`x-cortex-git`.github.alias == "cortex"
+  identifier: ffd87216-7271-326a-bf82-68d8c30b725a
+  weight: 1
+  level: Fully Migrated to GitHub SaaS
+filter:
+  kind: GENERIC
+  types:
+    include:
+    - service
