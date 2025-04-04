@@ -1,0 +1,94 @@
+tag: post-eks-migration-readiness
+name: Post EKS Migration Readiness
+description: "This Scorecard helps teams validate that their services meet key operational,\
+  \ security, and reliability standards after migrating to Amazon EKS. "
+draft: true
+notifications:
+  enabled: false
+  scoreDropNotificationsEnabled: false
+exemptions:
+  enabled: true
+  autoApprove: false
+evaluation:
+  window: 24
+ladder:
+  name: Default Ladder
+  levels:
+  - name: Bronze
+    rank: 1
+    color: "#c38b5f"
+  - name: Silver
+    rank: 2
+    color: "#8c9298"
+  - name: Gold
+    rank: 3
+    color: "#cda400"
+rules:
+- title: Alerts for EKS workloads are configured
+  expression: |-
+    datadog.monitors().filter(monitor =>
+      monitor.tags.anyMatch("env:prod-eks")
+    ).length > 0
+  identifier: 0d9361cf-8222-3055-93ff-1956bb91d08a
+  weight: 1
+  level: Silver
+- title: Logs are flowing to Datadog
+  expression: links("logs").length > 0
+  identifier: 24e9af56-4e3b-359c-aa9c-6938b032b500
+  weight: 1
+  level: Silver
+- title: Pod distribution spans multiple availability zones
+  expression: |-
+    aws.details().resources.filter(resource =>
+      resource.typeName == "AWS::EKS::Cluster" AND
+      jq(resource, ".metadata.ResourcesAvailabilityZones").length >= 2
+    ).length > 0
+  identifier: 383d4035-89da-32de-bc3f-77892a53e200
+  weight: 1
+  level: Gold
+- title: Pod metrics are flowing
+  expression: k8s.replicas().numAvailable > 0
+  identifier: 619c3e2e-3a40-3e29-9699-fda66da30d34
+  weight: 1
+  level: Bronze
+- title: Kubernetes deployments follow standard label conventions
+  expression: k8s.metadata().labels.all((label) => label.containsKey("app.kubernetes.io/name"))
+  identifier: 6fa8d0c2-a7dc-399d-ae89-37f2bf0698b4
+  weight: 1
+  level: Gold
+- title: Resource requests and limits are defined
+  expression: |-
+    jq(k8s.spec(), ".[].template.spec.containers[].resources.requests.cpu") != null AND
+    jq(k8s.spec(), ".[].template.spec.containers[].resources.limits.memory") != null
+  identifier: 8370e1fb-59cd-3657-83d5-7f8ba9b9702a
+  weight: 1
+  level: Bronze
+- title: EKS cluster is running in the correct region
+  expression: |-
+    aws.details().resources.filter(resource =>
+      resource.typeName == "AWS::EKS::Cluster" AND
+      jq(resource, ".metadata.Region") == "us-east-2"
+    ).length > 0
+  identifier: 92630a9c-0886-320e-9eec-0275e17f696e
+  weight: 1
+  level: Bronze
+- title: SLOs are defined
+  expression: |
+    slos().length > 0
+  identifier: ef0ca59d-6bfc-3630-a4da-c54bdb7b266c
+  weight: 1
+  level: Silver
+- title: EKS version is supported
+  expression: |-
+    aws.details().resources.filter(resource =>
+      resource.typeName == "AWS::EKS::Cluster" AND
+      jq(resource, ".metadata.Version").startsWith("1.29")
+    ).length == 0
+  identifier: f8278c22-3302-3cd9-b86f-3ccbe2c02e1d
+  weight: 1
+  level: Bronze
+filter:
+  kind: GENERIC
+  types:
+    include:
+    - service
