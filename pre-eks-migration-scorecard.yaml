@@ -1,0 +1,54 @@
+tag: eks-migration-readiness
+name: Pre EKS Migration Readiness
+draft: true
+notifications:
+  enabled: false
+  scoreDropNotificationsEnabled: false
+exemptions:
+  enabled: true
+  autoApprove: false
+evaluation:
+  window: 24
+ladder:
+  name: Default Ladder
+  levels:
+  - name: Not Migration Ready
+    rank: 1
+    color: "#e52e2e"
+  - name: Migration Ready
+    rank: 2
+    color: "#7CCB92"
+rules:
+- title: Dependencies are defined
+  expression: dependencies.in().length > 0
+  identifier: 121c8293-de64-3b7a-ad8c-42223a078f32
+  weight: 1
+  level: Migration Ready
+- title: Ownership is defined
+  expression: ownership != null
+  identifier: 2d3e1a5a-2012-3b28-b561-dd31c73117aa
+  weight: 1
+  level: Migration Ready
+- title: 'Health checks defined '
+  expression: |-
+    (jq(k8s.spec(), ".[].template.spec.containers[].livenessProbe") != null) AND
+    (jq(k8s.spec(), ".[].template.spec.containers[].readinessProbe") != null)
+  identifier: 46a8fba4-d9cd-31cb-b20b-e9e0d06ddde4
+  weight: 1
+  level: Migration Ready
+- title: Resource limits are defined
+  expression: "jq(k8s.spec(), \".[].template.spec.containers[].resources.limits.cpu\"\
+    ) != null"
+  identifier: a1f752a2-c177-3f56-9bf0-f89dda5a4023
+  weight: 1
+  level: Migration Ready
+- title: Service is deployed via Helm
+  expression: git.fileExists("Chart.yaml")
+  identifier: b88ec064-9f29-3bb4-9793-7a41569b622f
+  weight: 1
+  level: Migration Ready
+filter:
+  kind: GENERIC
+  types:
+    include:
+    - service
